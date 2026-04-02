@@ -25,51 +25,160 @@ GenAI-Academy-Apac-2026
 
 ## 📌 Overview
 
-The **Summarizer Agent** is a simple yet powerful AI agent that takes any input text and generates a concise summary using **Gemini 2.5 Flash**.
+The **Summarizer Agent** has been upgraded into a **Text Intelligence Agent** that goes beyond basic summarization.
 
-It demonstrates the fundamentals of building an AI agent using **Google ADK**, including tool integration, prompt design, and deployment to Cloud Run.
+It is built using **Google ADK** and powered by **Gemini 2.0 Flash**, supporting multiple natural language processing capabilities within a single agent.
+
+---
 
 ## ⚙️ Features
 
-* Accepts long-form text input
-* Generates concise 3–5 sentence summaries
-* Uses clear and simple language
-* Fully deployable as an HTTP endpoint
+* 📝 Summarizes long text into concise insights
+* ❓ Answers user questions (with or without context)
+* 🏷️ Classifies text (sentiment + topic)
+* 🔀 Handles fixed queries like help, about, and capabilities
+* 🌐 Deployable as a Cloud Run HTTP endpoint
+
+---
 
 ## 🏗️ Architecture
 
-* **Root Agent**: Handles all incoming requests
-* **Tool**: `summarize_text` (passes input to LLM)
-* **Model**: Gemini 2.5 Flash
+### 🔹 Root Agent
 
-## 🚀 Deployment
+* `text_intelligence_agent`
+* Handles all incoming requests
+* Routes tasks intelligently to the correct tool
 
-The agent is deployed using:
+### 🔹 Tools (4 Total)
 
-* Google Cloud Run
-* Artifact Registry
-* Cloud Build
-* Vertex AI (Gemini)
+1. **summarize_text**
 
-## 🧪 Example Use Case
+   * Generates concise summaries (3–5 sentences)
 
-Input:
+2. **answer_question**
+
+   * Answers user queries clearly
+   * Supports optional context-based answers
+
+3. **classify_text**
+
+   * Provides:
+
+     * Sentiment → positive / negative / neutral
+     * Topic → tech / finance / health / sports / general
+
+4. **route_request**
+
+   * Handles:
+
+     * `help`, `capabilities`, `about`, `contact`
+
+---
+
+## 🧠 How It Works
+
+* The agent receives input via API or UI
+* Uses instruction-based reasoning to:
+
+  * Identify user intent
+  * Select the correct tool
+* Gemini generates the final response
+
+---
+
+## 🔁 Decision Logic
+
+* "summarize / condense" → summarization
+* Question-based input → question answering
+* "classify / sentiment" → classification
+* "help / about / capabilities" → routing
+* Default → summarization
+
+---
+
+## ☁️ Deployment
+
+* **Framework**: Google ADK (`google-adk==1.14.0`)
+* **Model**: Gemini 2.0 Flash *(updated)*
+* **Platform**: Google Cloud Run
+
+---
+
+## 📦 Dependencies
+
+```txt
+google-adk==1.14.0
+python-dotenv==1.0.1
+```
+
+---
+
+## 🧪 Example Use Cases
+
+**Summarization**
 
 ```
-Artificial intelligence is transforming industries...
+Summarize: AI is transforming industries...
 ```
 
-Output:
+**Question Answering**
 
 ```
-AI is transforming industries by enabling automation and solving complex problems...
+What is machine learning?
 ```
+
+**Classification**
+
+```
+Classify: The company reported record profits this quarter.
+```
+
+**Routing**
+
+```
+capabilities
+```
+
+---
+
+## 🔄 Redeployment
+
+```bash
+source .env
+uvx --from google-adk==1.14.0 adk deploy cloud_run ...
+```
+
+* Zero-downtime updates
+* Same service URL retained
+
+---
+
+## 📁 Project Structure
+
+```
+summarizer_agent/
+├── __init__.py
+├── agent.py
+├── requirements.txt
+├── .env.example
+├── .gitignore
+```
+
+---
+
+## 🚀 Key Improvements
+
+* Upgraded from single-task summarizer → multi-capability agent
+* Added question answering and classification
+* Introduced intelligent request routing
+* Fully aligned with hackathon requirements
+
+---
 
 ## 📖 Reference
 
-Implementation based on the ADK deployment guide 
+Updated deployment guide: 
 
----
 
 # 🎓 Project 2: Campus Placement Assistant
 
