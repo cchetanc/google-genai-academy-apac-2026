@@ -1,119 +1,178 @@
 """
-Text Intelligence Agent
-------------------------
-A single AI agent built with Google ADK that uses Gemini for inference.
-Capability: Text Summarization + Question Answering + Classification + Routing
+agent.py — Campus Placement Assistant v2
+Upgraded for Track 2: Multi-agent + MCP + Firestore + Multi-step workflow + API deployment
 
-Satisfies all hackathon criteria:
-  [OK] Implemented using ADK (google-adk)
-  [OK] Uses Gemini model for inference
-  [OK] Performs clearly defined tasks (summarization, QA, classification, routing)
-  [OK] Accepts an input request and returns a response
-  [OK] Deployed on Cloud Run, callable via HTTP endpoint
+Requirements met:
+  ✅ Primary agent coordinating sub-agents (SequentialAgent pattern)
+  ✅ Structured data stored/retrieved from Firestore via MCP
+  ✅ MCP tool integration (placement_mcp_server.py)
+  ✅ Multi-step workflow (greet → research → coach → format)
+  ✅ API-based deployment (Cloud Run)
 """
-
 import os
+import sys
+import logging
+import google.cloud.logging
 from dotenv import load_dotenv
-from google.adk.agents import Agent
+
+from google.adk.agents import Agent, SequentialAgent
+from google.adk.tools.tool_context import ToolContext
+from google.adk.tools.langchain_tool import LangchainTool
+from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioConnectionParams
+from mcp import StdioServerParameters
+
+from langchain_community.tools import WikipediaQueryRun
+from langchain_community.utilities import WikipediaAPIWrapper
+
+# ── Setup ────────────────────────────────────────────────────────────────────
+try:
+    cloud_logging_client = google.cloud.logging.Client()
+    cloud_logging_client.setup_logging()
+except Exception:
+    logging.basicConfig(level=logging.INFO)
 
 load_dotenv()
+model_name = os.getenv("MODEL", "gemini-2.5-flash")
 
-model_name = os.getenv("MODEL", "gemini-2.0-flash")
+MCP_SERVER_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "placement_mcp_server.py")
+)
 
-
-# Tool 1: Text Summarization
-def summarize_text(text: str) -> dict:
-    """Summarizes a block of text into 3-5 concise sentences."""
-    return {
-        "task": "summarization",
-        "input_length": len(text),
-        "instruction": "Summarize the provided text in 3-5 sentences, preserving key facts."
-    }
-
-
-# Tool 2: Question Answering
-def answer_question(question: str, context: str = "") -> dict:
-    """Answers a question, optionally grounded in a provided context passage."""
-    return {
-        "task": "question_answering",
-        "question": question,
-        "has_context": bool(context),
-        "instruction": "Answer the question clearly. If context is provided, base the answer on it."
-    }
-
-
-# Tool 3: Text Classification
-def classify_text(text: str) -> dict:
-    """Classifies text by sentiment (pos/neg/neutral) and topic (tech/finance/health/sports/general)."""
-    return {
-        "task": "classification",
-        "input_length": len(text),
-        "instruction": (
-            "Classify the text on two dimensions:\n"
-            "1. Sentiment: positive, negative, or neutral\n"
-            "2. Topic: tech, finance, health, sports, or general\n"
-            "Return both labels with a one-sentence justification for each."
+# ── MCP Toolset (connects to placement_mcp_server.py via stdio) ───────────────
+placement_mcp_toolset = MCPToolset(
+    connection_params=StdioConnectionParams(
+        server_params=StdioServerParameters(
+            command=sys.executable,
+            args=[MCP_SERVER_PATH],
         )
-    }
+    )
+)
 
+# ── Wikipedia Tool ────────────────────────────────────────────────────────────
+wikipedia_tool = LangchainTool(
+    tool=WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper())
+)
 
-# Tool 4: Request Routing (fixed response logic)
-def route_request(request_type: str) -> dict:
-    """Routes a request to a fixed response. Types: help, capabilities, about, contact."""
-    routes = {
-        "help": (
-            "I can help you with:\n"
-            "- Summarize: send any text and I will condense it\n"
-            "- Answer: ask me any question (with or without context)\n"
-            "- Classify: I will label your text by sentiment and topic\n"
-            "- Help / Capabilities / About: fixed info responses"
-        ),
-        "capabilities": (
-            "This agent supports four capabilities:\n"
-            "1. Text Summarization\n"
-            "2. Question Answering\n"
-            "3. Text Classification\n"
-            "4. Request Routing (fixed responses)"
-        ),
-        "about": (
-            "Text Intelligence Agent - Gen AI Academy APAC Hackathon.\n"
-            "Built with: Google ADK + Gemini 2.0 Flash + Cloud Run.\n"
-            "Developer: Chetan P Kamath"
-        ),
-        "contact": (
-            "Developer: Chetan P Kamath\n"
-            "Submission: https://summarizer-agent-24293491909.us-central1.run.app/"
-        ),
-    }
-    key = request_type.lower().strip()
-    response = routes.get(key, f"Unknown route. Try: help, capabilities, about, contact.")
-    return {"task": "routing", "request_type": key, "response": response}
+# ── State Tool ────────────────────────────────────────────────────────────────
+def add_prompt_to_state(tool_context: ToolContext, prompt: str) -> dict:
+    """Save the student's placement query to shared agent state."""
+    tool_context.state["PROMPT"] = prompt
+    logging.info(f"[State] Student prompt saved: {prompt}")
+    return {"status": "success"}
 
-
-# Root Agent — ADK entry point
-root_agent = Agent(
-    name="text_intelligence_agent",
+# ── AGENT 1: Resume & Company Analyst ────────────────────────────────────────
+resume_analyst = Agent(
+    name="resume_analyst",
     model=model_name,
-    description=(
-        "A single AI agent that performs text summarization, question answering, "
-        "text classification, and request routing via a public HTTP endpoint."
-    ),
+    description="Researches the target company using MCP database and Wikipedia, provides resume tips.",
     instruction="""
-You are a Text Intelligence Agent with four tools:
+        You are an expert campus placement advisor.
+        The student's query is in: { PROMPT }
 
-1. summarize_text(text)          - Summarize / condense / shorten text
-2. answer_question(question, context) - Answer questions (context optional)
-3. classify_text(text)           - Classify by sentiment and topic
-4. route_request(request_type)   - Fixed responses: help, capabilities, about, contact
+        Your tasks:
+        1. Use the 'get_company_info' MCP tool with the company name from the prompt.
+           This retrieves structured data from the Firestore database.
+        2. Use 'wikipedia_tool' to find general info about the company
+           (industry, products, founding, culture).
+        3. Based on both sources, provide:
+           - Key skills the student should highlight on their resume
+           - Interview rounds breakdown with CTC range
+           - One actionable preparation tip
 
-DECISION RULES:
-- "summarize / condense / shorten" + text  -> summarize_text
-- Question word (what/why/how/who/when/?) -> answer_question
-- "classify / sentiment / label"           -> classify_text
-- "help / capabilities / about / contact"  -> route_request
-- Ambiguous + text provided               -> default to summarize_text
+        Be specific and concise. Output as structured text.
+    """,
+    tools=[placement_mcp_toolset, wikipedia_tool],
+    output_key="company_research"
+)
 
-Always call the right tool first, then return a clear, helpful response.
-""",
-    tools=[summarize_text, answer_question, classify_text, route_request],
+# ── AGENT 2: Interview Coach ──────────────────────────────────────────────────
+interview_coach = Agent(
+    name="interview_coach",
+    model=model_name,
+    description="Generates 5 targeted practice interview questions for the company.",
+    instruction="""
+        You are a senior technical interviewer.
+        Use the COMPANY_RESEARCH below to generate 5 targeted practice questions
+        (mix of technical + HR) a student should prepare for this company.
+        For each question, provide a 1-2 sentence model answer hint.
+
+        COMPANY_RESEARCH:
+        { company_research }
+    """,
+    output_key="interview_questions"
+)
+
+# ── AGENT 3: Session Saver ────────────────────────────────────────────────────
+session_saver = Agent(
+    name="session_saver",
+    model=model_name,
+    description="Saves the student's session to the Firestore database via MCP.",
+    instruction="""
+        You are responsible for persisting the student's session to the database.
+
+        Use the 'save_student_session' MCP tool to save this session with:
+        - student_id: generate a simple id like "student_001"
+        - company: extract the company name from { PROMPT }
+        - notes: summarize key tips from { company_research }
+
+        This ensures the session is stored in Firestore for future reference.
+        After saving, confirm with a brief message.
+    """,
+    tools=[placement_mcp_toolset],
+    output_key="session_saved"
+)
+
+# ── AGENT 4: Response Formatter ───────────────────────────────────────────────
+response_formatter = Agent(
+    name="response_formatter",
+    model=model_name,
+    description="Combines all research and questions into a clean, encouraging final response.",
+    instruction="""
+        You are a friendly placement cell coordinator.
+        Combine the research and interview questions into one comprehensive response.
+
+        Structure your response as:
+        1. 🏢 Company Snapshot (domain, CTC, overview)
+        2. 📄 Resume Tips (top skills to highlight)
+        3. 🔁 Interview Process (rounds breakdown)
+        4. 🎯 Top 5 Practice Questions with Model Answer Hints
+        5. 💾 Session Saved confirmation
+        6. 🚀 One motivational closing tip
+
+        Data:
+        Company Research: { company_research }
+        Interview Questions: { interview_questions }
+        Session Status: { session_saved }
+
+        Be warm, clear, and encouraging.
+    """
+)
+
+# ── SEQUENTIAL WORKFLOW ───────────────────────────────────────────────────────
+placement_workflow = SequentialAgent(
+    name="placement_workflow",
+    description="Full placement preparation pipeline: research → coach → save → format.",
+    sub_agents=[
+        resume_analyst,    # Step 1: Fetch from MCP/Firestore + Wikipedia
+        interview_coach,   # Step 2: Generate Q&As
+        session_saver,     # Step 3: Persist to Firestore via MCP
+        response_formatter # Step 4: Format final response
+    ]
+)
+
+# ── ROOT AGENT ────────────────────────────────────────────────────────────────
+root_agent = Agent(
+    name="placement_greeter",
+    model=model_name,
+    description="Entry point for the Campus Placement Assistant.",
+    instruction="""
+        Greet the student warmly and introduce yourself as their
+        AI-powered Campus Placement Assistant (powered by Google ADK + MCP + Firestore).
+
+        Ask them: Which company are you preparing for?
+        Once they respond, use 'add_prompt_to_state' to save their answer,
+        then hand off to the placement_workflow agent.
+    """,
+    tools=[add_prompt_to_state],
+    sub_agents=[placement_workflow]
 )
