@@ -155,193 +155,93 @@ uvx --from google-adk==1.14.0 adk deploy cloud_run ...
 
 ## 📁 Project Structure
 
-```
-summarizer_agent/
-├── __init__.py
-├── agent.py
-├── requirements.txt
-├── .env.example
-├── .gitignore
-```
-
----
-
-## 🚀 Key Improvements
-
-* Upgraded from single-task summarizer → multi-capability agent
-* Added question answering and classification
-* Introduced intelligent request routing
-* Fully aligned with hackathon requirements
-
----
-
-## 📖 Reference
-
-Updated deployment guide: 
-
-
-# 🎓 Project 2: Campus Placement Assistant
-
-## 📌 Overview
-
-The **Placement Assistant** is a **multi-agent AI system** designed to help students prepare for campus placements. It provides:
-
-* Resume guidance
-* Company-specific preparation tips
-* Interview questions
-* HR round strategies
-
-This project extends the ADK framework into a real-world, high-impact use case for students.
-
-## 💡 Key Idea
-
-Students can interact conversationally with the agent and receive **end-to-end placement preparation guidance** tailored to a specific company.
-
-## 🏗️ Architecture (Multi-Agent Workflow)
-
-The system uses a **Sequential Agent pipeline**:
-
-1. **Greeter (Root Agent)**
-
-   * Captures user intent
-   * Routes workflow
-
-2. **Resume Analyst**
-
-   * Fetches company data
-   * Suggests resume improvements
-
-3. **Interview Coach**
-
-   * Generates interview questions
-   * Provides answer hints
-
-4. **Response Formatter**
-
-   * Produces structured final output
-
-## 🧰 Tools Used
-
-* `company_db_tool` (custom internal database)
-* `wikipedia_tool` (for company insights)
-* Shared state management via ADK
-
-## ⚙️ Features
-
-* Company-specific preparation guidance
-* Resume improvement suggestions
-* Real interview questions with hints
-* Motivational and structured responses
-* Works for companies like Google, Amazon, Microsoft, TCS, Infosys
-
-## 🧪 Example Queries
-
-* "I am preparing for Google"
-* "Help me with Amazon placement"
-* "What about TCS NQT?"
-
-## 📊 Output Includes
-
-* Company snapshot
-* Required skills
-* Interview process
-* 5 practice questions with hints
-* Final motivational tip
-
-## ☁️ Deployment
-
-* Hosted on **Google Cloud Run**
-* Uses **Gemini 2.5 Flash via Vertex AI**
-* Built and deployed using **ADK CLI**
-
-## 🌍 Why This Project Matters
-
-* Solves a real student problem in the APAC region
-* Highly interactive and demo-friendly
-* Extensible to real job platforms and resume parsing
-
-## 📖 Reference
-
-Detailed implementation from project submission document 
-
----
-
-# ☁️ Tech Stack
-
-* **Google ADK (Agent Development Kit)**
-* **Gemini 2.5 Flash (Vertex AI)**
-* **Python 3.11+**
-* **Cloud Run**
-* **Cloud Build**
-* **Artifact Registry**
-* **LangChain (Wikipedia Tool)**
-
----
-
-# 🚀 Getting Started
-
-## 1. Clone the Repository
-
-```bash
-git clone <your-repo-link>
-cd GenAI-Academy-Apac-2026
-```
-
-## 2. Set Up Environment
-
-* Create a `.env` file with:
-
-```
-MODEL="gemini-2.5-flash"
-```
-
-## 3. Install Dependencies
-
-```bash
-uv venv
-source .venv/bin/activate
-uv pip install -r requirements.txt
-```
-
-## 4. Deploy (Example)
-
-```bash
-uvx --from google-adk==1.14.0 adk deploy cloud_run ...
-```
-
----
-
-# 🧪 Testing
-
-After deployment:
-
-* Open Cloud Run service URL
-* Use ADK UI chat interface
-* Try sample prompts for both agents
-
----
-
-# 📌 Notes
-
-* `.env` file should NOT be committed to GitHub
-* Uses only free-tier compatible GCP services
-* Easily extensible with additional tools and APIs
-
----
-
-# 🙌 Acknowledgment
-
-Built as part of **GenAI Academy APAC 2026 – Track 1: Build & Deploy AI Agents**
-
----
-
-# 📬 Future Improvements
-
-* Resume PDF parsing (Document AI)
-* Integration with job portals (LinkedIn, Naukri)
-* Voice-based mock interviews
-* Personalized learning paths
-
----
-
-⭐ If you found this project interesting, feel free to star the repo!
+🎓 Project 2: Campus Placement Assistant (v2 – Multi-Agent + MCP + Firestore)
+📌 Overview
+
+The Placement Assistant v2 is an upgraded multi-agent AI system designed to help students prepare for campus placements with real-time data, persistent storage, and tool integration.
+
+It extends the v1 solution by introducing:
+
+MCP-based tool integration
+Firestore database for storage
+Session tracking and persistence
+
+This makes the system production-ready and fully aligned with advanced AI agent workflows.
+
+💡 Key Idea
+
+Provide a personalized, end-to-end placement preparation assistant that:
+
+Understands user queries
+Fetches company-specific data
+Generates interview guidance
+Stores user progress for future use
+🏗️ Architecture (Multi-Agent Workflow)
+
+The system uses a Sequential Multi-Agent pipeline with MCP integration:
+
+Greeter (Primary Agent)
+Captures user intent
+Routes workflow
+Resume Analyst
+Fetches company data via MCP + Firestore
+Performs additional research
+Interview Coach
+Generates interview questions & answers
+Session Saver (NEW)
+Saves session data using MCP → Firestore
+Response Formatter
+Produces structured final output
+🔌 MCP Tools (NEW)
+
+The system integrates external tools using MCP:
+
+get_company_info → Fetch company data from Firestore
+list_companies → Retrieve available companies
+save_student_session → Store user session data
+🗄️ Database Integration (NEW)
+
+Uses Firestore (Native Mode) with two collections:
+
+companies → Stores company placement data
+student_sessions → Stores user interaction history
+
+This enables persistent memory and real-time data retrieval.
+
+⚙️ Features
+Multi-agent AI system with orchestration
+Company-specific interview preparation
+AI-generated interview Q&A
+MCP-based tool integration
+Firestore-backed persistent storage
+Session tracking and history
+Multi-step workflow execution
+Structured and personalized responses
+Scalable API deployment
+🧪 Example Queries
+"I am preparing for Google"
+"Help me prepare for Amazon"
+"What about TCS NQT?"
+"List all companies"
+📊 Output Includes
+Company insights (rounds, skills, tips)
+Interview questions with guidance
+Preparation strategy
+Stored session for future reference
+☁️ Deployment
+Platform: Google Cloud Run
+AI Model: Gemini 2.5 Flash (Vertex AI)
+Framework: Google ADK
+Database: Firestore
+Protocol: MCP (Model Context Protocol)
+🌍 Why This Project Matters
+Solves real placement challenges for students
+Demonstrates multi-agent + tool + database integration
+Shows production-ready AI system design
+Highly scalable and extensible for ed-tech platforms
+🚀 Key Improvements (v2)
+Added MCP server for tool integration
+Introduced Firestore for persistent storage
+Added session_saver agent
+Enabled real-time data + memory
+Fully meets advanced hackathon requirements
